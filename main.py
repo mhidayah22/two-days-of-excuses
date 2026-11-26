@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Two Days of Excuses - make.fun entry.
 
-Writes the one-line excuse to entry.txt in MAKEFUN_OUTPUT_DIR (then /output,
-then the directory holding this program).
+Writes the one-line excuse to entry.txt. The output directory is
+MAKEFUN_OUTPUT_DIR first, then /output when it exists, then the directory
+holding this program, so the grader's read-only checkout still works.
 """
 
 import os
 import sys
 
 ENTRY = "I estimated five minutes, then spent two days optimising the estimate."
+
+MAX_LEN = 200
 
 
 def validate(line):
@@ -17,8 +20,17 @@ def validate(line):
         raise ValueError("entry must be a single line")
     if not line.strip():
         raise ValueError("entry must not be blank")
-    if not 1 <= len(line) <= 200:
+    if not 1 <= len(line) <= MAX_LEN:
         raise ValueError("entry must be 1-200 characters, got %d" % len(line))
+
+
+def resolve_output_dir():
+    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR")
+    if out_dir:
+        return out_dir
+    if os.path.isdir("/output"):
+        return "/output"
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def main():
@@ -26,14 +38,17 @@ def main():
         validate(ENTRY)
     except ValueError as exc:
         print("invalid entry: %s" % exc, file=sys.stderr)
-        raise SystemExit(1)
-    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR")
-    if not out_dir:
-        out_dir = "/output" if os.path.isdir("/output") else os.path.dirname(os.path.abspath(__file__))
-    os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "entry.txt"), "w", encoding="utf-8") as f:
-        f.write(ENTRY + "\n")
+        return 1
+    out_dir = resolve_output_dir()
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, "entry.txt"), "w", encoding="utf-8") as f:
+            f.write(ENTRY + "\n")
+    except OSError as exc:
+        print("cannot write entry: %s" % exc, file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
